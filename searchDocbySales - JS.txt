@@ -1,0 +1,165 @@
+import { LightningElement, track } from 'lwc';
+import searchDocuments from '@salesforce/apex/DocumentSearchController.searchDocuments';
+import sendDocumentEmail from '@salesforce/apex/DocumentEmailSender.sendDocumentEmail';
+import getRecentDocuments from '@salesforce/apex/DocumentSearchController.getRecentDocuments';
+import { ShowToastEvent } from 'lightning/platformShowToastEvent';
+
+export default class PitchPerfectSearch extends LightningElement {
+    @track searchTerm = '';
+    @track results = [];
+    @track recentFiles = [];
+    @track loading = false;
+    @track searchClicked = false;
+
+    @track showEmailModal = false;
+    @track recipientEmail = '';
+    @track selectedDocument = {};
+
+    @track showUploadModal = false;
+
+    connectedCallback() {
+        this.fetchRecentDocuments();
+    }
+
+    fetchRecentDocuments() {
+        getRecentDocuments()
+            .then(data => {
+                this.recentFiles = data || [];
+            })
+            .catch(error => {
+                console.error('Error fetching recent documents', error);
+                this.recentFiles = [];
+            });
+    }
+
+    handleInput(event) {
+        this.searchTerm = event.target.value;
+    }
+
+    handleSearch() {
+        this.searchClicked = true;
+        this.results = [];
+        
+        if (!this.searchTerm || this.searchTerm.length < 2) {
+            this.showToast('Error', 'Please type at least 2 characters to search.', 'error');
+            this.loading = false;
+            return;
+        }
+
+        this.loading = true;
+
+        searchDocuments({ searchTerm: this.searchTerm, minHits: 1 })
+            .then(data => {
+                this.results = (data || []).map(item => ({
+                    ...item,
+                    iconName: this.computeFileIcon(item.extraInfo)
+                }));
+                this.loading = false;
+            })
+            .catch(error => {
+                console.error('Search error', error);
+                this.loading = false;
+                this.results = [];
+            });
+    }
+
+    handlePreview(event) {
+      const link = event.target.dataset.link;
+      if (link) {
+          window.open(link, '_blank');
+      }
+  }
+
+  handleDownload(event) {
+    const link = event.target.dataset.link;
+    if (link) {
+        const a = document.createElement('a');
+        a.href = link;
+        a.target = '_blank';
+        a.download = ''; // Important: triggers file download
+        a.click();
+    }
+}
+
+handleClear() {
+  this.searchTerm = '';
+  this.results = [];
+  this.searchClicked = false;
+  this.loading = false;
+  this.fetchRecentDocuments(); // Reload the 3 recent documents
+}
+
+    openUploadModal() {
+      this.showUploadModal = true;
+  }
+  
+  closeUploadModal() {
+      this.showUploadModal = false;
+  }
+  
+  handleFlowStatusChange(event) {
+      if (event.detail.status === 'FINISHED') {
+          this.showUploadModal = false;
+          this.showToast('Success', 'Document uploaded successfully!', 'success');
+          this.fetchRecentDocuments();
+      }
+  }
+
+    openEmailModal(event) {
+        const { id, title, link } = event.target.dataset;
+        this.selectedDocument = { id, title, link };
+        this.showEmailModal = true;
+    }
+
+    handleRecipientEmail(event) {
+        this.recipientEmail = event.target.value;
+    }
+
+    closeModal() {
+        this.showEmailModal = false;
+        this.recipientEmail = '';
+        this.selectedDocument = {};
+    }
+
+    sendEmail() {
+        if (!this.recipientEmail || !this.selectedDocument.link) {
+            this.showToast('Error', 'Recipient Email and Document Link are required.', 'error');
+            return;
+        }
+
+        sendDocumentEmail({
+            recipientEmail: this.recipientEmail,
+            documentTitle: this.selectedDocument.title,
+            documentLink: this.selectedDocument.link,
+            domainUrl: window.location.origin
+        })
+        .then(() => {
+            this.showToast('Success', 'Email sent successfully.', 'success');
+            this.closeModal();
+        })
+        .catch(error => {
+            console.error('Email send error', error);
+            this.showToast('Error', 'Failed to send email.', 'error');
+        });
+    }
+
+    computeFileIcon(extraInfo) {
+        if (!extraInfo) return 'doctype:unknown';
+        const name = extraInfo.toLowerCase();
+        if (name.endsWith('.pdf')) return 'doctype:pdf';
+        if (name.endsWith('.doc') || name.endsWith('.docx')) return 'doctype:word';
+        if (name.endsWith('.xls') || name.endsWith('.xlsx')) return 'doctype:excel';
+        if (name.endsWith('.ppt') || name.endsWith('.pptx')) return 'doctype:ppt';
+        if (name.endsWith('.csv')) return 'doctype:csv';
+        if (name.endsWith('.txt')) return 'doctype:txt';
+        return 'doctype:attachment';
+    }
+
+    showToast(title, message, variant) {
+        this.dispatchEvent(new ShowToastEvent({
+            title,
+            message,
+            variant
+        }));
+    }
+}

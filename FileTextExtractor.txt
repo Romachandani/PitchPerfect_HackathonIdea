@@ -1,0 +1,47 @@
+// === Apex Class: FileTextExtractor.cls ===
+public with sharing class FileTextExtractor {
+
+    // Wrapper class for Flow input
+    public class InputWrapper {
+        @InvocableVariable(label = 'File ID')
+        public String fileId;
+    }
+
+    // Wrapper class for Flow output
+    public class OutputWrapper {
+        @InvocableVariable(label = 'Extracted Text')
+        public String text;
+
+        public OutputWrapper(String content) {
+            this.text = content;
+        }
+    }
+
+    // Invocable method that extracts text from ContentVersion (for .txt, .csv, .md)
+    @InvocableMethod(label = 'Extract Text from Uploaded File')
+    public static List<OutputWrapper> extractText(List<InputWrapper> inputList) {
+        List<OutputWrapper> outputList = new List<OutputWrapper>();
+
+        for (InputWrapper input : inputList) {
+            if (String.isNotBlank(input.fileId)) {
+                try {
+                    ContentVersion version = [
+                        SELECT VersionData FROM ContentVersion WHERE Id = :input.fileId LIMIT 1
+                    ];
+
+                    // Convert file blob to string (works for plain text formats)
+                    String fileContent = version.VersionData.toString();
+                    outputList.add(new OutputWrapper(fileContent));
+
+                } catch (Exception e) {
+                    System.debug('Failed to extract text: ' + e.getMessage());
+                    outputList.add(new OutputWrapper(''));
+                }
+            } else {
+                outputList.add(new OutputWrapper(''));
+            }
+        }
+
+        return outputList;
+    }
+}

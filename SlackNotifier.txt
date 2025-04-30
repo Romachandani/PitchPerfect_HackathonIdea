@@ -1,0 +1,24 @@
+public with sharing class SlackNotifier {
+
+    @future(callout=true)
+    public static void sendMessageAsync(String webhookPath, String messageText) {
+        try {
+            HttpRequest req = new HttpRequest();
+            req.setEndpoint('callout:Slack_Webhook' + webhookPath);
+            req.setMethod('POST');
+            req.setHeader('Content-Type', 'application/json');
+
+            Map<String, Object> payload = new Map<String, Object>();
+            payload.put('text', messageText);
+
+            req.setBody(JSON.serialize(payload));
+
+            Http http = new Http();
+            HTTPResponse res = http.send(req);
+
+            System.debug('Slack Response: ' + res.getBody());
+        } catch (Exception e) {
+            System.debug('SlackNotifier Error: ' + e.getMessage());
+        }
+    }
+}

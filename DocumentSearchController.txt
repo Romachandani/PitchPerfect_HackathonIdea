@@ -1,0 +1,97 @@
+public with sharing class DocumentSearchController {
+    
+    @AuraEnabled(cacheable=true)
+    public static List<SearchResultDTO> searchDocuments(String searchTerm, Integer minHits) {
+        List<SearchResultDTO> documents = new List<SearchResultDTO>();
+        
+        if (String.isBlank(searchTerm)) {
+            return documents;
+        }
+        
+        // First search in custom documents
+        String query = 'FIND {*' + String.escapeSingleQuotes(searchTerm) + '*} IN ALL FIELDS RETURNING ' +
+            'Sales_Enablement_Document__c (Id, Name, Document_Title__c, Tags__c, Persona__c, Product_Line__c, Region__c, Shared_Link__c LIMIT 10)';
+        
+        List<List<SObject>> searchResults = Search.query(query);
+        
+        if (!searchResults.isEmpty()) {
+            for (SObject record : searchResults[0]) {
+                Sales_Enablement_Document__c doc = (Sales_Enablement_Document__c) record;
+                documents.add(new SearchResultDTO(
+                    doc.Id,
+                    doc.Document_Title__c,
+                    doc.Shared_Link__c,
+                    'Document',
+                    doc.Name,
+                    null
+                ));
+            }
+        }
+        
+        // Fallback to files if no good matches
+        if (documents.isEmpty() || documents.size() < ((minHits != null) ? minHits : 1)) {
+            List<ContentVersion> fileList = [
+                SELECT Id, Title, Description, ContentDocumentId
+                FROM ContentVersion
+                WHERE (Title LIKE :('%' + searchTerm + '%') OR Description LIKE :('%' + searchTerm + '%'))
+                AND IsLatest = true
+                LIMIT 10
+            ];
+            for (ContentVersion file : fileList) {
+                documents.add(new SearchResultDTO(
+                    file.ContentDocumentId,
+                    file.Title,
+                    '/sfc/servlet.shepherd/document/download/' + file.ContentDocumentId,
+                    'File',
+                    file.Description,
+                    file.Id
+                ));
+            }
+        }
+        
+        return documents;
+    }
+    @AuraEnabled(cacheable=true)
+    public static List<SearchResultDTO> getRecentDocuments() {
+        List<SearchResultDTO> recentDocs = new List<SearchResultDTO>();
+        
+        List<Sales_Enablement_Document__c> docs = [
+            SELECT Id, Name, Shared_Link__c, Document_Title__c 
+            FROM Sales_Enablement_Document__c 
+            ORDER BY CreatedDate DESC 
+            LIMIT 3
+        ];
+        
+        for (Sales_Enablement_Document__c doc : docs) {
+            recentDocs.add(new SearchResultDTO(
+                doc.Id,
+                doc.Document_Title__c != null ? doc.Document_Title__c : doc.Name,
+                doc.Shared_Link__c,
+                'Document',
+                doc.Name,
+                null
+            ));
+        }
+        
+        return recentDocs;
+    }
+    
+    
+    public class SearchResultDTO {
+        @AuraEnabled public String id { get; set; }
+        @AuraEnabled public String title { get; set; }
+        @AuraEnabled public String link { get; set; }
+        @AuraEnabled public String type { get; set; }
+        @AuraEnabled public String extraInfo { get; set; }
+        @AuraEnabled public String contentVersionId { get; set; }
+        
+        public SearchResultDTO(String id, String title, String link, String type, String extraInfo, String contentVersionId) {
+            this.id = id;
+            this.title = title;
+            this.link = link;
+            this.type = type;
+            this.extraInfo = extraInfo;
+            this.contentVersionId = contentVersionId;
+        }
+    }
+}

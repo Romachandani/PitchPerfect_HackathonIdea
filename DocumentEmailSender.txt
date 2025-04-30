@@ -1,0 +1,28 @@
+public with sharing class DocumentEmailSender {
+    @AuraEnabled
+    public static void sendDocumentEmail(String recipientEmail, String documentTitle, String documentLink, String domainUrl) {
+        // Build the full absolute link
+        String fullLink;
+
+        if (documentLink.startsWith('http')) {
+            fullLink = documentLink;
+        } else {
+            fullLink = domainUrl + documentLink;
+        }
+
+        // Prepare the email
+        Messaging.SingleEmailMessage mail = new Messaging.SingleEmailMessage();
+        mail.setToAddresses(new String[] { recipientEmail });
+        mail.setSubject('Here is the document you requested: ' + documentTitle);
+        
+        String emailBody = 'Hello,<br/><br/>' +
+            'Please find the document link below:<br/><br/>' +
+            '<a href="' + fullLink + '" target="_blank">' + documentTitle + '</a><br/><br/>' +
+            'Thank you!<br/><br/>' +
+            '-- Salesforce Document Search System';
+        
+        mail.setHtmlBody(emailBody);
+        
+        Messaging.sendEmail(new Messaging.SingleEmailMessage[] { mail });
+    }
+}

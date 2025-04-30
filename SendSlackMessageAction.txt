@@ -1,0 +1,39 @@
+public with sharing class SendSlackMessageAction {
+
+    @InvocableMethod(label='Send Slack Notification')
+    public static void sendSlackNotification(ListRequest requests) {
+        
+        System.debug('Slack Notification - Triggered from Flow');
+        
+        String webhookPath = 'servicesT08PL4FCDUNB08PL4TQNTYw2PgnmIzytWKx2dFT61eAape'; 
+        
+        if (requests == null  requests.isEmpty()) {
+            System.debug('Slack Notification - No request payload received.');
+            return;
+        }
+        
+        for (Request req  requests) {
+            System.debug('Slack Notification - Document Title ' + req.documentTitle);
+            
+            if (String.isNotBlank(req.documentTitle)) {
+                String message = '📄 New Sales Document Uploaded!'
+                               + 'n➡️ Title ' + req.documentTitle
+                               + 'n📥 Uploaded via PitchPerfect';
+
+                try {
+                    SlackNotifier.sendMessageAsync(webhookPath, message);
+                    System.debug('Slack Notification - Message sent successfully.');
+                } catch (Exception e) {
+                    System.debug('Slack Notification - Error sending message ' + e.getMessage());
+                }
+            } else {
+                System.debug('Slack Notification - Blank title received.');
+            }
+        }
+    }
+
+    public class Request {
+        @InvocableVariable(label='Document Title' required=true)
+        public String documentTitle;
+    }
+}

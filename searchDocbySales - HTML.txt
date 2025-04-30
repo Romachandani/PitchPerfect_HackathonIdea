@@ -1,0 +1,152 @@
+<template>
+
+  <div class="upload-button-container">
+    <lightning-button 
+        label="Upload Document" 
+        onclick={openUploadModal} 
+        variant="brand"
+        class="upload-button">
+    </lightning-button>
+</div>
+
+  <div class="container">
+
+      <div class="search-section">
+          <h1 class="main-title">PitchPerfect</h1>
+          <p class="sub-title">Your Smart Salesforce Document Assistant</p>
+
+          <div class="search-box">
+              <lightning-input 
+                  label="Search Documents" 
+                  value={searchTerm} 
+                  onchange={handleInput} 
+                  placeholder="Type keywords..."
+                  variant="label-hidden">
+              </lightning-input>
+
+              <lightning-button 
+                  variant="brand" 
+                  label="Search" 
+                  onclick={handleSearch}
+                  class="search-button animate-button">
+              </lightning-button>
+
+              <lightning-button 
+                  variant="neutral" 
+                  label="Clear" 
+                  onclick={handleClear}
+                  class="clear-button">
+              </lightning-button>
+          </div>
+          
+      </div>
+
+      <template if:true={searchClicked}>
+        <template if:true={loading}>
+            <div class="loading-spinner">
+                <lightning-spinner alternative-text="Loading..."></lightning-spinner>
+            </div>
+        </template>
+
+      <template if:true={results.length}>
+          <div class="results-section">
+              <h2 class="section-title">Search Results</h2>
+              <ul class="results-list">
+                  <template for:each={results} for:item="doc">
+                      <li key={doc.id} class="result-card animate-fade">
+                          <div class="card-header">
+                              <lightning-icon icon-name={doc.iconName} size="small" class="card-icon"></lightning-icon>
+                              <strong><a href={doc.link} target="_blank" class="doc-title">{doc.title}</a></strong>
+                          </div>
+                          <div class="card-body">
+                              <div class="doc-info">{doc.extraInfo}</div>
+                              <div class="card-actions">
+                                  <lightning-button 
+                                        variant="neutral" 
+                                        label="Preview" 
+                                        data-link={doc.link} 
+                                        onclick={handlePreview}>
+                                    </lightning-button>
+                                  <lightning-button variant="brand-outline" label="Download" data-link={doc.link} onclick={handleDownload}></lightning-button>
+                                  <lightning-button variant="brand" label="Email" class="slds-m-left_small" data-id={doc.id} data-title={doc.title} data-link={doc.link} onclick={openEmailModal}></lightning-button>
+                                  
+                                </div>
+                          </div>
+                      </li>
+                  </template>
+              </ul>
+          </div>
+      </template>
+
+      <template if:false={results.length}>
+        <div class="no-results-message animate-fade">
+            <div>
+                <lightning-icon icon-name="utility:warning" size="small" class="slds-m-bottom_x-small"></lightning-icon>
+                <p>No files found matching your search.</p>
+                <p class="suggestion-text">Try searching with different keywords like "RPA", "Onboarding", "Sales".</p>
+            </div>
+        </div>
+    </template>
+</template>
+    
+
+      <template if:true={recentFiles.length}>
+          <div class="recent-section">
+              <h2 class="section-title">Recently Uploaded Documents</h2>
+              <div class="recent-cards">
+                  <template for:each={recentFiles} for:item="recent">
+                      <div key={recent.id} class="recent-card animate-zoom">
+                          <lightning-icon icon-name="doctype:attachment" size="small" class="recent-icon"></lightning-icon>
+                          <div class="recent-title">{recent.title}</div>
+                          <a href={recent.link} target="_blank" class="recent-link">View</a>
+                      </div>
+                  </template>
+              </div>
+          </div>
+      </template>
+
+  </div>
+
+  <!-- Email Modal -->
+  <template if:true={showEmailModal}>
+      <section class="slds-modal slds-fade-in-open">
+          <div class="slds-modal__container">
+              <header class="slds-modal__header">
+                  <h2 class="slds-modal__title">Send Document Link</h2>
+              </header>
+
+              <div class="slds-modal__content slds-p-around_medium">
+                  <lightning-input label="Recipient Email" value={recipientEmail} onchange={handleRecipientEmail}></lightning-input>
+              </div>
+
+              <footer class="slds-modal__footer">
+                  <lightning-button variant="neutral" label="Cancel" onclick={closeModal}></lightning-button>
+                  <lightning-button variant="brand" label="Send" onclick={sendEmail}></lightning-button>
+              </footer>
+          </div>
+      </section>
+      <div class="slds-backdrop slds-backdrop_open"></div>
+  </template>
+
+  <!-- Upload Document Flow Modal -->
+  <template if:true={showUploadModal}>
+    <section class="slds-modal slds-fade-in-open">
+        <div class="slds-modal__container">
+            <header class="slds-modal__header">
+                <h2 class="slds-modal__title">Upload Sales Document</h2>
+            </header>
+            <div class="slds-modal__content slds-p-around_medium">
+                <lightning-flow
+                    flow-api-name="Screen_Flow_with_File_Upload_Component"
+                    onstatuschange={handleFlowStatusChange}>
+                </lightning-flow>
+            </div>
+            <footer class="slds-modal__footer">
+                <lightning-button variant="neutral" label="Done" onclick={closeUploadModal}></lightning-button>
+            </footer>
+        </div>
+    </section>
+    <div class="slds-backdrop slds-backdrop_open"></div>
+</template>
+</template>
+
